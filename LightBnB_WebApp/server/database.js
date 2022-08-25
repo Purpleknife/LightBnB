@@ -102,22 +102,62 @@ exports.getAllReservations = getAllReservations;
 
 // * Get all properties.
 
-const getAllProperties = (options, limit = 10) => {
-  return pool.query(
-    `SELECT * FROM properties
-    LIMIT $1;`,
-    [limit])
-  .then((result) => {
-    //console.log(result.rows);
-    return result.rows;
-  })
+const getAllProperties = (options, limit) => {
+  const queryParams = [];
+ 
+  let queryString = `
+  SELECT properties.*, AVG(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews ON properties.id = property_id
+  `;
+
+  // Add to the query depending on what's passed in 'options'.
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParams.length} `;
+  }
+
+  if (options.owner_id) {
+    queryParams.push(Number(options.owner_id));
+    queryString += (queryParams.length > 1) ? `AND` : `WHERE`;
+    queryString += ` owner_id = $${queryParams.length} `;
+  }
+  
+  if (options.minimum_price_per_night) {
+    queryParams.push(Number(options.minimum_price_per_night) * 100); // *100 because the cost is stored in cents, not in dollars, in the database.
+    queryString += (queryParams.length > 1) ? `AND` : `WHERE`;
+    queryString += ` cost_per_night >= $${queryParams.length} `;
+  }
+
+  if (options.maximum_price_per_night) {
+    queryParams.push(Number(options.maximum_price_per_night) * 100);
+    queryString += (queryParams.length > 1) ? `AND` : `WHERE`;
+    queryString += ` cost_per_night <= $${queryParams.length} `;
+  }
+
+  queryString += `GROUP BY properties.id `
+
+  if (options.minimum_rating) {
+    queryParams.push(Number(options.minimum_rating));
+    queryString += `HAVING AVG(property_reviews.rating) >= $${queryParams.length} `;
+  }
+  
+  queryParams.push(limit = 10); //When 10 is passed in the function, it becomes 20 (?) So I put the 10 here to fix it.
+  queryString += `
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length};
+  `;
+
+  console.log(queryString, queryParams);
+  
+  return pool.query(queryString, queryParams)
+  .then((res) => res.rows)
   .catch((err) => {
     console.log(err.message);
   })
 };
 
 exports.getAllProperties = getAllProperties;
-
 
 /**
  * Add a property to the database
