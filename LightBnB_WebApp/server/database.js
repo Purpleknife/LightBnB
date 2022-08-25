@@ -181,3 +181,20 @@ const addProperty = (property) => {
 };
 
 exports.addProperty = addProperty;
+
+const makeAReservation = (reservation) => {
+  return pool.query(
+    `INSERT INTO reservations (start_date, end_date, property_id, guest_id)
+    VALUES ($1, $2, $3, $4)
+    RETURNING *;`,
+    [reservation.start_date, reservation.end_date, reservation.property_id, reservation.guest_id])
+  .then((result) => {
+    console.log('Add reservation ===>', result.rows[0]);
+    return result.rows[0];
+  })
+  .catch((err) => {
+    console.log(err.message);
+  })
+}
+
+exports.makeAReservation = makeAReservation;
